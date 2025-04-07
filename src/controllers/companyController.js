@@ -1,76 +1,249 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const Company = require('../models/Company');
-const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/secret');
-
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-};
-
-// Company login
-exports.loginCompany = async (req, res) => {
-  try {
-    const { companyEmail, password } = req.body;
-
-    // Find company by email
-    const company = await Company.findOne({ companyEmail });
-    if (!company) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Check password
-    const isMatch = await bcrypt.compare(password, company.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Generate token
-    const token = generateToken(company._id);
-
-    res.json({ token, company });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Create a new company
-exports.createCompany = async (req, res) => {
-  try {
-    const company = new Company(req.body);
-    await company.save();
-    res.status(201).json(company);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+const CompanyCertification = require('../models/CompanyCertification');
+const CompanyTraining = require('../models/CompanyTraining');
 
 // Get all companies
-exports.getCompanies = async (req, res) => {
+exports.getAllCompanies = async (req, res) => {
   try {
-    const companies = await Company.find().populate('certificationList.service');
-    res.json(companies);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const query = {};
+    
+    // Text search
+    if (req.query.search) {
+      query.$text = { $search: req.query.search };
+    }
+    
+    // Filter by origin country
+    if (req.query.country) {
+      query.originCountry = req.query.country;
+    }
+    
+    // Filter by category
+    if (req.query.category) {
+      query.category = req.query.category;
+    }
+    
+    // Filter by field
+    if (req.query.field) {
+      query.fields = req.query.field;
+    }
+    
+    // Filter by active status
+    if (req.query.active) {
+      query.isActive = req.query.active === 'true';
+    }
+    
+    const companies = await Company.find(query)
+      .populate('fields')
+      .sort({ name: 1 });
+      
+    res.status(200).json({
+      success: true,
+      count: companies.length,
+      data: companies
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch companies',
+      error: error.message
+    });
   }
 };
 
-// Update a company
+// Get single company
+exports.getCompany = async (req, res) => {
+  try {
+    const company = await Company.findById(req.params.id)
+      .populate('fields');
+      
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Company not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: company
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch company',
+      error: error.message
+    });
+  }
+};
+
+// Create new company
+exports.createCompany = async (req, res) => {
+  try {
+    // Check if companyIdentifier is unique
+    if (req.body.companyIdentifier) {
+      const existingCompany = await Company.findOne({ 
+        companyIdentifier: req.body.companyIdentifier 
+      });
+      
+      if (existingCompany) {
+        return res.status(400).json({
+          success: false,
+          message: 'Company identifier already in use'
+        });
+      }
+    }
+    
+    const company = await Company.create(req.body);
+    
+    res.status(201).json({
+      success: true,
+      data: company
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create company',
+      error: error.message
+    });
+  }
+};
+
+// Update company
 exports.updateCompany = async (req, res) => {
   try {
-    const company = await Company.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(company);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Check if updating companyIdentifier to a unique value
+    if (req.body.companyIdentifier) {
+      const existingCompany = await Company.findOne({ 
+        companyIdentifier: req.body.companyIdentifier,
+        _id: { $ne: req.params.id }
+      });
+      
+      if (existingCompany) {
+        return res.status(400).json({
+          success: false,
+          message: 'Company identifier already in use'
+        });
+      }
+    }
+    
+    const company = await Company.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    ).populate('fields');
+    
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Company not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: company
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update company',
+      error: error.message
+    });
   }
 };
 
-// Delete a company
+// Delete company
 exports.deleteCompany = async (req, res) => {
   try {
-    await Company.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Company deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const company = await Company.findById(req.params.id);
+    
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Company not found'
+      });
+    }
+    
+    // Delete associated certifications and trainings
+    await CompanyCertification.deleteMany({ company: req.params.id });
+    await CompanyTraining.deleteMany({ company: req.params.id });
+    
+    await company.remove();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Company and all its associations deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete company',
+      error: error.message
+    });
+  }
+};
+
+// Get company by identifier
+exports.getCompanyByIdentifier = async (req, res) => {
+  try {
+    const company = await Company.findOne({ 
+      companyIdentifier: req.params.identifier 
+    }).populate('fields');
+    
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Company not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: company
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch company',
+      error: error.message
+    });
+  }
+};
+
+// Get distinct countries
+exports.getCountries = async (req, res) => {
+  try {
+    const countries = await Company.distinct('originCountry');
+    
+    res.status(200).json({
+      success: true,
+      count: countries.length,
+      data: countries
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch countries',
+      error: error.message
+    });
+  }
+};
+
+// Get distinct company categories
+exports.getCategories = async (req, res) => {
+  try {
+    const categories = await Company.distinct('category');
+    
+    res.status(200).json({
+      success: true,
+      count: categories.length,
+      data: categories
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch categories',
+      error: error.message
+    });
   }
 };

@@ -6,10 +6,10 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
-const serviceCategoryRoutes = require('./routes/serviceCategoryRoutes');
-const serviceRoutes = require('./routes/serviceRoutes');
-const companyRoutes = require('./routes/companyRoutes');
-const authRoutes = require('./routes/authRoutes');
+const fieldRouter = require('./routes/fieldRouter');
+const certificationRouter = require('./routes/certificationRouter');
+const trainingRouter = require('./routes/trainingRouter');
+const companyRouter = require('./routes/companyRouter');
 
 const app = express();
 
@@ -41,11 +41,12 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Routes
-app.use('/api/service-categories', serviceCategoryRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/companies', companyRoutes);
-app.use('/api/auth', authRoutes);
+//Rooutes
+app.use('/api/fields', fieldRouter);  
+app.use('/api/certifications', certificationRouter);
+app.use('/api/trainings', trainingRouter);
+app.use('/api/companies', companyRouter);
+
 
 // Default Route
 app.get('/', (req, res) => {

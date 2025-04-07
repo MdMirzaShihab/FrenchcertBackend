@@ -10,15 +10,10 @@ const fieldSchema = new mongoose.Schema({
   description: {
     type: String,
     trim: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
 }, { timestamps: true });
+
+// Index on description for better search performance
+fieldSchema.index({ description: 'text' });
 
 module.exports = mongoose.model('Field', fieldSchema);

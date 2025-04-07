@@ -1,52 +1,48 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const trainingSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  // Embed training type directly
-  trainingType: {
+const trainingSchema = new mongoose.Schema(
+  {
     name: {
       type: String,
       required: true,
-      trim: true
+      trim: true,
     },
     description: {
       type: String,
-      trim: true
-    }
+      required: true,
+      trim: true,
+    },
+    trainingType: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    trainingMethod: {
+      type: [String],
+      required: true,
+      trim: true,
+      enum: ["online", "in-person", "hybrid"],
+    },
+    fields: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Field",
+      },
+    ],
+    durationInHours: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
   },
-  // Fields as references for better reusability
-  fields: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Field'
-  }],
-  durationInHours: {
-    type: Number,
-    required: true,
-    min: 1
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // Index for better search performance
-trainingSchema.index({ name: 'text', description: 'text', 'trainingType.name': 'text' });
+trainingSchema.index({
+  name: "text",
+  description: "text",
+  trainingType: "text",
+});
 
-module.exports = mongoose.model('Training', trainingSchema);
+module.exports = mongoose.model("Training", trainingSchema);

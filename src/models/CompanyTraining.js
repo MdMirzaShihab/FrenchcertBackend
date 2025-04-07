@@ -32,17 +32,10 @@ const companyTrainingSchema = new mongoose.Schema({
     trim: true
   },
   completed: {
-    type: Boolean,
-    default: true
+    type: String,
+    enum: ['Requested', 'In Progress', 'Completed', 'Time to Retrain'],
+    default: 'Completed'
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
 }, { timestamps: true });
 
 // Compound index for specific company trainings

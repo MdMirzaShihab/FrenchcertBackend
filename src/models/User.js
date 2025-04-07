@@ -12,7 +12,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    match: [/.+\@.+\..+/, 'Please enter a valid email address'],
   },
   password: {
     type: String,
@@ -28,30 +29,24 @@ const userSchema = new mongoose.Schema({
     default: true
   },
   lastLogin: {
-    type: Date
-  },
-  createdAt: {
     type: Date,
-    default: Date.now
+    default: null,
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+
 }, { timestamps: true });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
+    if (!this.isModified('password')) return next(); // If password isn't modified, skip hashing
+    
+    try {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);  // Hash the password
+      next();
+    } catch (error) {
+      next(error);  // Pass error to next middleware
+    }
+  });
 
 // Method to compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {

@@ -10,6 +10,7 @@ const fieldRouter = require('./routes/fieldRouter');
 const certificationRouter = require('./routes/certificationRouter');
 const trainingRouter = require('./routes/trainingRouter');
 const companyRouter = require('./routes/companyRouter');
+const companyCertificationRouter = require('./routes/companyCertificationRouter');
 
 const app = express();
 
@@ -34,18 +35,19 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Rate limiter to prevent excessive requests
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
-  message: { error: "Too many requests from this IP, please try again later" },
-});
-app.use('/api/', limiter);
+// const limiter = rateLimit({
+//   // windowMs: 15 * 60 * 1000, // 15 minutes
+//   // max: 100, // Limit each IP to 100 requests per window
+//   message: { error: "Too many requests from this IP, please try again later" },
+// });
+// app.use('/api/', limiter);
 
 //Rooutes
 app.use('/api/fields', fieldRouter);  
 app.use('/api/certifications', certificationRouter);
 app.use('/api/trainings', trainingRouter);
 app.use('/api/companies', companyRouter);
+app.use('/api/company-certifications', companyCertificationRouter);
 
 
 // Default Route

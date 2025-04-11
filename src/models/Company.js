@@ -27,13 +27,15 @@ const companySchema = new mongoose.Schema({
   },
   fields: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Field'
+    ref: 'Field',
+    required: true
   }],
   email: {
     type: String,
     required: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
   },
   phone: {
     type: String,
@@ -62,17 +64,9 @@ const companySchema = new mongoose.Schema({
       trim: true
     }
   },
-  companyIdentifier: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
 }, { timestamps: true });
 
 // Compound index for searching companies
 companySchema.index({ name: 'text', scope: 'text' });
-// Index for unique identifier lookup
-companySchema.index({ companyIdentifier: 1 });
 
 module.exports = mongoose.model('Company', companySchema);

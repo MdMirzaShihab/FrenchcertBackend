@@ -17,9 +17,6 @@ router.get('/categories/list', companyController.getCategories);
 // Get a single company by MongoDB ID
 router.get('/:id', companyController.getCompany);
 
-// Get a company by its identifier
-router.get('/identifier/:identifier', companyController.getCompanyByIdentifier);
-
 // Update a company
 router.put('/:id', companyController.updateCompany);
 

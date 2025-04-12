@@ -59,6 +59,30 @@ exports.getAllCompanyCertifications = async (req, res) => {
   }
 };
 
+// Get all companies with a specific certification
+exports.getCompaniesByCertification = async (req, res) => {
+    try {
+      const companyCertifications = await CompanyCertification.find({ certification: req.params.certificationId })
+        .populate({
+          path: 'company',
+          select: 'name companyIdentifier category'
+        })
+        .sort({ expiryDate: 1 });
+  
+      res.status(200).json({
+        success: true,
+        count: companyCertifications.length,
+        data: companyCertifications
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch companies with this certification',
+        error: error.message
+      });
+    }
+  };
+
 // Get single company certification
 exports.getCompanyCertification = async (req, res) => {
   try {

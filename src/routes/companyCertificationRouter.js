@@ -18,6 +18,10 @@ router.post('/', companyCertificationController.createCompanyCertification);
 // @desc    Update a company certification by ID
 router.put('/:id', companyCertificationController.updateCompanyCertification);
 
+// @route   GET /api/company-certifications/certification/:certificationId
+// @desc    Get all companies with a specific certification
+router.get('/certification/:certificationId', companyCertificationController.getCompaniesByCertification);
+
 // @route   DELETE /api/company-certifications/:id
 // @desc    Delete a company certification by ID
 router.delete('/:id', companyCertificationController.deleteCompanyCertification);

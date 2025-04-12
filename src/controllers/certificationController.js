@@ -1,4 +1,6 @@
 const Certification = require('../models/Certification');
+const CompanyCertification = require('../models/CompanyCertification');
+
 
 // Get all certifications
 exports.getAllCertifications = async (req, res) => {
@@ -123,19 +125,30 @@ exports.deleteCertification = async (req, res) => {
       });
     }
     
-    // Check if certification is assigned to any companies
-    // Implement reference check if needed
+    // Check if any companies have this certification
+    const companyCount = await CompanyCertification.countDocuments({ 
+      certification: req.params.id 
+    });
     
-    await certification.remove();
+    if (companyCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete certification as it is assigned to one or more companies',
+        error: 'REFERENCE_ERROR'
+      });
+    }
+    
+    await certification.deleteOne(); // Using deleteOne() instead of remove()
     
     res.status(200).json({
       success: true,
       message: 'Certification deleted successfully'
     });
   } catch (error) {
+    console.error('Delete certification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete certification',
+      message: 'Internal server error while deleting certification',
       error: error.message
     });
   }

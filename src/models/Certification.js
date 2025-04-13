@@ -10,7 +10,6 @@ const certificationSchema = new mongoose.Schema(
     description: {
       type: String,
       required: true,
-      trim: true,
     },
     certificationType: {
       type: String,
@@ -43,10 +42,9 @@ const certificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for better search performance
+// Text indexing
 certificationSchema.index({
     name: "text",
-    description: "text",
     certificationType: "text",
   });
 

@@ -203,13 +203,14 @@ exports.deleteCompanyCertification = async (req, res) => {
       });
     }
     
-    await companyCertification.remove();
+    await CompanyCertification.deleteOne({ _id: req.params.id });
     
     res.status(200).json({
       success: true,
       message: 'Company certification deleted successfully'
     });
   } catch (error) {
+    console.error('Delete error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete company certification',

@@ -23,12 +23,22 @@ const trainingSchema = new mongoose.Schema(
       trim: true,
       enum: ["online", "in-person", "hybrid"],
     },
-    fields: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Field",
+    fields: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Field",
+          required: true,
+        },
+      ],
+      validate: {
+        validator: function (value) {
+          return Array.isArray(value) && value.length > 0;
+        },
+        message: "At least one field is required.",
       },
-    ],
+      required: [true, "Fields are required."],
+    },
     durationInHours: {
       type: Number,
       required: true,

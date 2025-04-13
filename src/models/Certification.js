@@ -17,12 +17,24 @@ const certificationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    fields: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Field",
+    
+    fields: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Field",
+          required: true,
+        },
+      ],
+      validate: {
+        validator: function (value) {
+          return Array.isArray(value) && value.length > 0;
+        },
+        message: "At least one field is required.",
       },
-    ],
+      required: [true, "Fields are required."],
+    },
+
     durationInMonths: {
       type: Number,
       min: 1,

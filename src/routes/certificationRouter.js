@@ -20,4 +20,8 @@ router.put('/:id', certificationController.updateCertification);
 // Delete certification
 router.delete('/:id', certificationController.deleteCertification);
 
+
+router.get('/public/list', certificationController.getPublicCertifications);
+router.get('/public/:id', certificationController.getPublicCertificationDetails);
+
 module.exports = router;

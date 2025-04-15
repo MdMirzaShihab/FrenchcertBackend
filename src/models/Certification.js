@@ -6,6 +6,20 @@ const certificationSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      unique: true,
+    },
+    shortDescription: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          // Split the string by spaces and count the number of words
+          const wordCount = v.split(/\s+/).length;
+          return wordCount >= 15 && wordCount <= 18;
+        },
+        message: 'shortDescription must contain between 15 to 18 words',
+      },
     },
     description: {
       type: String,
@@ -16,7 +30,10 @@ const certificationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    
+    callToAction: {
+      type: String,
+      required: true,
+    },
     fields: {
       type: [
         {
@@ -42,10 +59,9 @@ const certificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Text indexing
-certificationSchema.index({
-    name: "text",
-    certificationType: "text",
-  });
+// Indexing
+certificationSchema.index({ name: 'text', certificationType: 'text' }); // Text index for searching
+certificationSchema.index({ certificationType: 1 }); // Regular index for type filtering
+certificationSchema.index({ fields: 1 }); // Index for fields filtering
 
 module.exports = mongoose.model("Certification", certificationSchema);

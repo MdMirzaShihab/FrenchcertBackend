@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const sanitizeHtml = require('sanitize-html');
+mongoose.plugin(require('mongoose-paginate-v2'));
 
 const certificationSchema = new mongoose.Schema(
   {
@@ -13,9 +15,8 @@ const certificationSchema = new mongoose.Schema(
       required: true,
       trim: true,
       validate: {
-        validator: function (v) {
-          // Split the string by spaces and count the number of words
-          const wordCount = v.split(/\s+/).length;
+        validator: function(v) {
+          const wordCount = v.trim().split(/\s+/).filter(word => word.length > 0).length;
           return wordCount >= 15 && wordCount <= 18;
         },
         message: 'shortDescription must contain between 15 to 18 words',
@@ -24,15 +25,26 @@ const certificationSchema = new mongoose.Schema(
     description: {
       type: String,
       required: true,
+      set: (value) => sanitizeHtml(value, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          a: ['href', 'name', 'target', 'rel'],
+          img: ['src', 'alt', 'width', 'height']
+        },
+        allowedSchemes: ['http', 'https', 'data']
+      })
     },
     certificationType: {
       type: String,
       required: true,
       trim: true,
+      unique: true
     },
     callToAction: {
       type: String,
       required: true,
+      trim: true
     },
     fields: {
       type: [
@@ -50,18 +62,25 @@ const certificationSchema = new mongoose.Schema(
       },
       required: [true, "Fields are required."],
     },
-
     durationInMonths: {
       type: Number,
       min: 1,
+      required: true
     },
   },
   { timestamps: true }
 );
 
-// Indexing
-certificationSchema.index({ name: 'text', certificationType: 'text' }); // Text index for searching
-certificationSchema.index({ certificationType: 1 }); // Regular index for type filtering
-certificationSchema.index({ fields: 1 }); // Index for fields filtering
+// Case-insensitive text index
+certificationSchema.index({ 
+  name: 'text', 
+  certificationType: 'text' 
+}, {
+  collation: { locale: 'en', strength: 2 } 
+});
+
+// Regular indexes
+certificationSchema.index({ certificationType: 1 });
+certificationSchema.index({ fields: 1 });
 
 module.exports = mongoose.model("Certification", certificationSchema);

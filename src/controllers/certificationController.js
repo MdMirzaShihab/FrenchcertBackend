@@ -1,36 +1,64 @@
 const Certification = require("../models/Certification");
 const CompanyCertification = require("../models/CompanyCertification");
+const mongoose = require("mongoose");
 
-// Get all certifications
+// Helper function for case-insensitive search
+const buildSearchQuery = (searchTerm) => {
+  return {
+    $or: [
+      { name: { $regex: searchTerm, $options: 'i' } },
+      { certificationType: { $regex: searchTerm, $options: 'i' } }
+    ]
+  };
+};
+
+// Get all certifications with pagination and search
 exports.getAllCertifications = async (req, res) => {
   try {
+    const { search, type, field, page = 1, limit = 10 } = req.query;
     const query = {};
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      populate: "fields",
+      sort: { name: 1 }
+    };
 
-    // Text search (searches both name and certificationType)
-    if (req.query.search) {
-      query.$text = { $search: req.query.search };
+    // Text search
+    if (search) {
+      Object.assign(query, buildSearchQuery(search));
     }
 
-    // Filter by certificationType if provided
-    if (req.query.type) {
-      query.certificationType = { $regex: new RegExp(req.query.type, 'i') };
+    // Filter by certificationType
+    if (type) {
+      query.certificationType = { $regex: new RegExp(type, 'i') };
     }
 
     // Field filter
-    if (req.query.field) {
-      query.fields = { 
-        $in: [mongoose.Types.ObjectId(req.query.field)] 
-      };
+    if (field) {
+      try {
+        query.fields = { 
+          $in: [new mongoose.Types.ObjectId(field)] 
+        };
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid field ID format"
+        });
+      }
     }
 
-    const certifications = await Certification.find(query)
-      .populate("fields")
-      .sort({ name: 1 });
+    const result = await Certification.paginate(query, options);
 
     res.status(200).json({
       success: true,
-      count: certifications.length,
-      data: certifications,
+      data: {
+        certifications: result.docs,
+        total: result.totalDocs,
+        limit: result.limit,
+        page: result.page,
+        pages: result.totalPages
+      }
     });
   } catch (error) {
     console.error('Filter error:', error);
@@ -45,9 +73,15 @@ exports.getAllCertifications = async (req, res) => {
 // Get single certification
 exports.getCertification = async (req, res) => {
   try {
-    const certification = await Certification.findById(req.params.id).populate(
-      "fields"
-    );
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid certification ID format"
+      });
+    }
+
+    const certification = await Certification.findById(req.params.id)
+      .populate("fields");
 
     if (!certification) {
       return res.status(404).json({
@@ -71,6 +105,9 @@ exports.getCertification = async (req, res) => {
 
 // Create new certification
 exports.createCertification = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     // Validate required fields
     const requiredFields = [
@@ -80,66 +117,39 @@ exports.createCertification = async (req, res) => {
       "certificationType",
       "callToAction",
       "fields",
+      "durationInMonths"
     ];
-    for (const field of requiredFields) {
-      if (!req.body[field]) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} is required`,
-        });
-      }
-    }
-
-    // Validate fields array is not empty
-    if (!Array.isArray(req.body.fields) || req.body.fields.length === 0) {
+    
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "At least one field is required",
+        message: `Missing required fields: ${missingFields.join(', ')}`
       });
     }
 
-    // Optional: Sanitize and trim the input data
-    req.body.name = req.body.name.trim();
-    req.body.shortDescription = req.body.shortDescription.trim();
-    req.body.description = req.body.description.trim();
-    req.body.certificationType = req.body.certificationType.trim();
-    req.body.callToAction = req.body.callToAction.trim();
-
-    // Optionally: Validate shortDescription (word count or length check)
-    const wordCount = req.body.shortDescription.split(" ").length;
-    if (wordCount < 15 || wordCount > 18) {
-      return res.status(400).json({
-        success: false,
-        message: "Short description should be between 15 to 18 words.",
-      });
-    }
-
-    const existingCert = await Certification.findOne({
+    // Trim and sanitize inputs
+    const certificationData = {
       name: req.body.name.trim(),
-    });
-    if (existingCert) {
-      return res.status(400).json({
-        success: false,
-        message: "Certification with this name already exists",
-        error: "DUPLICATE_NAME",
-      });
-    }
-
-    const certification = await Certification.create({
-      name: req.body.name,
-      shortDescription: req.body.shortDescription,
-      description: req.body.description,
-      certificationType: req.body.certificationType,
-      callToAction: req.body.callToAction,
+      shortDescription: req.body.shortDescription.trim(),
+      description: req.body.description, // Already sanitized by schema
+      certificationType: req.body.certificationType.trim(),
+      callToAction: req.body.callToAction.trim(),
       fields: req.body.fields,
-      durationInMonths: req.body.durationInMonths || 12,
-    });
+      durationInMonths: req.body.durationInMonths
+    };
 
+    const certification = await Certification.create([certificationData], { session });
+
+    await session.commitTransaction();
+    
     res.status(201).json({
       success: true,
-      data: certification,
+      data: certification[0],
     });
-  }  catch (error) {
+  } catch (error) {
+    await session.abortTransaction();
+    
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({
@@ -150,10 +160,11 @@ exports.createCertification = async (req, res) => {
     }
     
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
       return res.status(400).json({
         success: false,
-        message: 'Certification name must be unique',
-        error: 'DUPLICATE_NAME'
+        message: `${field} must be unique`,
+        error: 'DUPLICATE_KEY'
       });
     }
     
@@ -162,52 +173,48 @@ exports.createCertification = async (req, res) => {
       message: 'Failed to create certification',
       error: error.message
     });
+  } finally {
+    session.endSession();
   }
 };
 
 // Update certification
 exports.updateCertification = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-
-    if (req.body.name) {
-      const existingCert = await Certification.findOne({ 
-        name: req.body.name.trim(),
-        _id: { $ne: req.params.id } // Exclude current certification
-      });
-      
-      if (existingCert) {
-        return res.status(400).json({
-          success: false,
-          message: 'Another certification with this name already exists',
-          error: 'DUPLICATE_NAME'
-        });
-      }
-    }
-    // Validate fields array is not empty if provided
-    if (
-      req.body.fields &&
-      (!Array.isArray(req.body.fields) || req.body.fields.length === 0)
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
         success: false,
-        message: "At least one field is required",
+        message: "Invalid certification ID format"
       });
     }
+
+    const updateData = {};
+    if (req.body.name) updateData.name = req.body.name.trim();
+    if (req.body.shortDescription) updateData.shortDescription = req.body.shortDescription.trim();
+    if (req.body.description) updateData.description = req.body.description;
+    if (req.body.certificationType) updateData.certificationType = req.body.certificationType.trim();
+    if (req.body.callToAction) updateData.callToAction = req.body.callToAction.trim();
+    if (req.body.fields) {
+      if (!Array.isArray(req.body.fields) || req.body.fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one field is required"
+        });
+      }
+      updateData.fields = req.body.fields;
+    }
+    if (req.body.durationInMonths) updateData.durationInMonths = req.body.durationInMonths;
 
     const certification = await Certification.findByIdAndUpdate(
       req.params.id,
-      {
-        name: req.body.name,
-        shortDescription: req.body.shortDescription,
-        description: req.body.description,
-        certificationType: req.body.certificationType,
-        callToAction: req.body.callToAction,
-        fields: req.body.fields,
-        durationInMonths: req.body.durationInMonths,
-      },
+      updateData,
       {
         new: true,
         runValidators: true,
+        session
       }
     ).populate("fields");
 
@@ -218,11 +225,15 @@ exports.updateCertification = async (req, res) => {
       });
     }
 
+    await session.commitTransaction();
+    
     res.status(200).json({
       success: true,
       data: certification,
     });
-  }  catch (error) {
+  } catch (error) {
+    await session.abortTransaction();
+    
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({
@@ -233,10 +244,11 @@ exports.updateCertification = async (req, res) => {
     }
     
     if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
       return res.status(400).json({
         success: false,
-        message: 'Certification name must be unique',
-        error: 'DUPLICATE_NAME'
+        message: `${field} must be unique`,
+        error: 'DUPLICATE_KEY'
       });
     }
     
@@ -245,14 +257,26 @@ exports.updateCertification = async (req, res) => {
       message: 'Failed to update certification',
       error: error.message
     });
+  } finally {
+    session.endSession();
   }
 };
 
 // Delete certification
 exports.deleteCertification = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const certification = await Certification.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid certification ID format"
+      });
+    }
 
+    // Check if certification exists
+    const certification = await Certification.findById(req.params.id).session(session);
     if (!certification) {
       return res.status(404).json({
         success: false,
@@ -262,40 +286,41 @@ exports.deleteCertification = async (req, res) => {
 
     // Check if any companies have this certification
     const companyCount = await CompanyCertification.countDocuments({
-      certification: req.params.id,
-    });
+      certification: req.params.id
+    }).session(session);
 
     if (companyCount > 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "Cannot delete certification as it is assigned to one or more companies",
+        message: "Cannot delete certification as it is assigned to one or more companies",
         error: "REFERENCE_ERROR",
       });
     }
 
-    await certification.deleteOne();
+    await Certification.findByIdAndDelete(req.params.id).session(session);
+    await session.commitTransaction();
 
     res.status(200).json({
       success: true,
       message: "Certification deleted successfully",
     });
   } catch (error) {
+    await session.abortTransaction();
     console.error("Delete certification error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while deleting certification",
       error: error.message,
     });
+  } finally {
+    session.endSession();
   }
 };
 
 // Get certification types
 exports.getCertificationTypes = async (req, res) => {
   try {
-    // Distinct query to get unique certification types
     const types = await Certification.distinct("certificationType");
-
     res.status(200).json({
       success: true,
       count: types.length,
@@ -310,29 +335,38 @@ exports.getCertificationTypes = async (req, res) => {
   }
 };
 
-// Get public certifications (for website visitors)
+// Get public certifications
 exports.getPublicCertifications = async (req, res) => {
   try {
+    const { search, type, page = 1, limit = 10 } = req.query;
     const query = {};
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      select: "name shortDescription certificationType durationInMonths fields",
+      sort: { name: 1 },
+      populate: "fields"
+    };
 
-    // Text search
-    if (req.query.search) {
-      query.$text = { $search: req.query.search };
+    if (search) {
+      Object.assign(query, buildSearchQuery(search));
     }
 
-    // Filter by certificationType if provided
-    if (req.query.type) {
-      query.certificationType = { $regex: new RegExp(req.query.type, 'i') };
+    if (type) {
+      query.certificationType = { $regex: new RegExp(type, 'i') };
     }
 
-    const certifications = await Certification.find(query)
-      .select("name shortDescription certificationType durationInMonths")
-      .sort({ name: 1 });
+    const result = await Certification.paginate(query, options);
 
     res.status(200).json({
       success: true,
-      count: certifications.length,
-      data: certifications,
+      data: {
+        certifications: result.docs,
+        total: result.totalDocs,
+        limit: result.limit,
+        page: result.page,
+        pages: result.totalPages
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -346,10 +380,16 @@ exports.getPublicCertifications = async (req, res) => {
 // Get public certification details
 exports.getPublicCertificationDetails = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid certification ID format"
+      });
+    }
+
     const certification = await Certification.findById(req.params.id)
-      .select(
-        "name description certificationType callToAction durationInMonths"
-      );
+      .select("name description certificationType callToAction durationInMonths fields")
+      .populate("fields");
 
     if (!certification) {
       return res.status(404).json({

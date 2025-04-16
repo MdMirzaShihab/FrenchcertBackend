@@ -17,9 +17,9 @@ const certificationSchema = new mongoose.Schema(
       validate: {
         validator: function(v) {
           const wordCount = v.trim().split(/\s+/).filter(word => word.length > 0).length;
-          return wordCount >= 15 && wordCount <= 18;
+          return wordCount >= 10 && wordCount <= 20;
         },
-        message: 'shortDescription must contain between 15 to 18 words',
+        message: 'shortDescription must contain between 10 to 20 words',
       },
     },
     description: {

@@ -24,14 +24,14 @@ exports.getAllCertifications = async (req, res) => {
       sort: { name: 1 }
     };
 
-    // Text search
+    // Text search (searches name and certificationType fields)
     if (search) {
       Object.assign(query, buildSearchQuery(search));
     }
 
-    // Filter by certificationType
+    // Filter by certificationType - EXACT MATCH
     if (type) {
-      query.certificationType = { $regex: new RegExp(type, 'i') };
+      query.certificationType = type; 
     }
 
     // Field filter
@@ -344,16 +344,18 @@ exports.getPublicCertifications = async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       select: "name shortDescription certificationType durationInMonths fields",
-      sort: { name: 1 },
-      populate: "fields"
+      populate: "fields",
+      sort: { name: 1 }
     };
 
+    // Text search (searches name and certificationType fields)
     if (search) {
       Object.assign(query, buildSearchQuery(search));
     }
 
+    // Filter by certificationType - EXACT MATCH
     if (type) {
-      query.certificationType = { $regex: new RegExp(type, 'i') };
+      query.certificationType = type; // Exact match instead of regex
     }
 
     const result = await Certification.paginate(query, options);

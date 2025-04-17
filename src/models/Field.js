@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+mongoose.plugin(require('mongoose-paginate-v2'));
 
 const fieldSchema = new mongoose.Schema({
   name: {

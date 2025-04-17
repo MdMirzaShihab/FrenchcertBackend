@@ -11,6 +11,7 @@ const certificationRouter = require('./routes/certificationRouter');
 const trainingRouter = require('./routes/trainingRouter');
 const companyRouter = require('./routes/companyRouter');
 const companyCertificationRouter = require('./routes/companyCertificationRouter');
+const dashboardRouter = require('./routes/dashboardRouter');
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/certifications', certificationRouter);
 app.use('/api/trainings', trainingRouter);
 app.use('/api/companies', companyRouter);
 app.use('/api/company-certifications', companyCertificationRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 
 // Default Route

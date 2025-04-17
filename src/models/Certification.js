@@ -39,39 +39,51 @@ const certificationSchema = new mongoose.Schema(
     },
     certificationType: {
       type: String,
-      required: true,
+      required: [true, 'Certification type is required'],
       trim: true,
       unique: true
     },
     callToAction: {
       type: String,
-      required: true,
-      trim: true
+      required: [true, 'Call to action text is required'],
+      trim: true,
+      maxlength: [50, 'Call to action cannot exceed 50 characters']
     },
     fields: {
       type: [
         {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Field",
-          required: true,
+          required: [true, 'Field reference is required'],
         },
       ],
       validate: {
-        validator: function (value) {
-          return Array.isArray(value) && value.length > 0;
+        validator: function(value) {
+          return Array.isArray(value) && value.length > 0 && value.length <= 5;
         },
-        message: "At least one field is required.",
+        message: 'At least one field is required and maximum 5 fields allowed'
       },
-      required: [true, "Fields are required."],
+      required: [true, "At least one field is required"]
     },
     durationInMonths: {
       type: Number,
-      min: 1,
-      required: true
+      min: [1, 'Duration must be at least 1 month'],
+      max: [99, 'Duration cannot exceed 36 months'],
+      required: [true, 'Duration is required'],
     },
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
 );
+
+// Virtual for duration in years (rounded to 1 decimal)
+certificationSchema.virtual('durationInYears').get(function() {
+  return parseFloat((this.durationInMonths / 12).toFixed(1));
+});
+
 
 // Case-insensitive text index
 certificationSchema.index({ 

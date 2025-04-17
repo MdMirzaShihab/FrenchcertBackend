@@ -2,6 +2,37 @@ const Certification = require("../models/Certification");
 const CompanyCertification = require("../models/CompanyCertification");
 const mongoose = require("mongoose");
 
+// Helper functions
+const buildSearchQuery = (searchTerm) => ({
+  $or: [
+    { name: { $regex: searchTerm, $options: "i" } },
+    { certificationType: { $regex: searchTerm, $options: "i" } },
+  ],
+});
+
+const validateCertificationData = (data) => {
+  const requiredFields = [
+    "name",
+    "shortDescription",
+    "description",
+    "certificationType",
+    "callToAction",
+    "fields",
+    "durationInMonths",
+  ];
+  return requiredFields.filter((field) => !data[field]);
+};
+
+const prepareCertificationData = (body) => ({
+  name: body.name?.trim(),
+  shortDescription: body.shortDescription?.trim(),
+  description: body.description, // Already sanitized by schema
+  certificationType: body.certificationType?.trim(),
+  callToAction: body.callToAction?.trim(),
+  fields: body.fields,
+  durationInMonths: body.durationInMonths,
+});
+
 // Get all certifications with pagination and search
 exports.getAllCertifications = async (req, res) => {
   try {
@@ -12,15 +43,6 @@ exports.getAllCertifications = async (req, res) => {
       limit: parseInt(limit),
       populate: "fields",
       sort: { name: 1 },
-    };
-    // Helper function for case-insensitive search
-    const buildSearchQuery = (searchTerm) => {
-      return {
-        $or: [
-          { name: { $regex: searchTerm, $options: "i" } },
-          { certificationType: { $regex: searchTerm, $options: "i" } },
-        ],
-      };
     };
 
     // Text search (searches name and certificationType fields)
@@ -35,16 +57,13 @@ exports.getAllCertifications = async (req, res) => {
 
     // Field filter
     if (field) {
-      try {
-        query.fields = {
-          $in: [new mongoose.Types.ObjectId(field)],
-        };
-      } catch (error) {
+      if (!mongoose.Types.ObjectId.isValid(field)) {
         return res.status(400).json({
           success: false,
           message: "Invalid field ID format",
         });
       }
+      query.fields = { $in: [new mongoose.Types.ObjectId(field)] };
     }
 
     const result = await Certification.paginate(query, options);
@@ -103,6 +122,35 @@ exports.getCertification = async (req, res) => {
   }
 };
 
+
+// Get all certifications for dropdown
+exports.getAllCertificationsForDropdown = async (req, res) => {
+  try {
+    const certifications = await Certification.find({})
+      .select('name') // Only select name field
+      .sort({ name: 1 })
+      .lean(); // Convert to plain JS object
+    
+    // Transform the data to ensure only _id and name are included
+    const simplifiedCertifications = certifications.map(cert => ({
+      _id: cert._id,
+      name: cert.name
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: simplifiedCertifications
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch certifications",
+      error: error.message,
+    });
+  }
+};
+
+
 // Create new certification
 exports.createCertification = async (req, res) => {
   const session = await mongoose.startSession();
@@ -110,17 +158,7 @@ exports.createCertification = async (req, res) => {
 
   try {
     // Validate required fields
-    const requiredFields = [
-      "name",
-      "shortDescription",
-      "description",
-      "certificationType",
-      "callToAction",
-      "fields",
-      "durationInMonths",
-    ];
-
-    const missingFields = requiredFields.filter((field) => !req.body[field]);
+    const missingFields = validateCertificationData(req.body);
     if (missingFields.length > 0) {
       return res.status(400).json({
         success: false,
@@ -128,17 +166,7 @@ exports.createCertification = async (req, res) => {
       });
     }
 
-    // Trim and sanitize inputs
-    const certificationData = {
-      name: req.body.name.trim(),
-      shortDescription: req.body.shortDescription.trim(),
-      description: req.body.description, // Already sanitized by schema
-      certificationType: req.body.certificationType.trim(),
-      callToAction: req.body.callToAction.trim(),
-      fields: req.body.fields,
-      durationInMonths: req.body.durationInMonths,
-    };
-
+    const certificationData = prepareCertificationData(req.body);
     const certification = await Certification.create([certificationData], {
       session,
     });
@@ -193,26 +221,16 @@ exports.updateCertification = async (req, res) => {
       });
     }
 
-    const updateData = {};
-    if (req.body.name) updateData.name = req.body.name.trim();
-    if (req.body.shortDescription)
-      updateData.shortDescription = req.body.shortDescription.trim();
-    if (req.body.description) updateData.description = req.body.description;
-    if (req.body.certificationType)
-      updateData.certificationType = req.body.certificationType.trim();
-    if (req.body.callToAction)
-      updateData.callToAction = req.body.callToAction.trim();
-    if (req.body.fields) {
-      if (!Array.isArray(req.body.fields) || req.body.fields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "At least one field is required",
-        });
-      }
-      updateData.fields = req.body.fields;
+    const updateData = prepareCertificationData(req.body);
+    if (
+      req.body.fields &&
+      (!Array.isArray(req.body.fields) || req.body.fields.length === 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one field is required",
+      });
     }
-    if (req.body.durationInMonths)
-      updateData.durationInMonths = req.body.durationInMonths;
 
     const certification = await Certification.findByIdAndUpdate(
       req.params.id,
@@ -352,8 +370,7 @@ exports.getPublicCertifications = async (req, res) => {
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
-      select: "name shortDescription certificationType durationInMonths fields",
-      populate: "fields",
+      select: "name shortDescription certificationType durationInMonths",
       sort: { name: 1 },
     };
 
@@ -362,9 +379,9 @@ exports.getPublicCertifications = async (req, res) => {
       Object.assign(query, buildSearchQuery(search));
     }
 
-    // Filter by certificationType - EXACT MATCH
+    // Filter by certificationType
     if (type) {
-      query.certificationType = type; // Exact match instead of regex
+      query.certificationType = type;
     }
 
     const result = await Certification.paginate(query, options);
@@ -398,11 +415,9 @@ exports.getPublicCertificationDetails = async (req, res) => {
       });
     }
 
-    const certification = await Certification.findById(req.params.id)
-      .select(
-        "name description certificationType callToAction durationInMonths fields"
-      )
-      .populate("fields");
+    const certification = await Certification.findById(req.params.id).select(
+      "name description certificationType callToAction durationInMonths"
+    );
 
     if (!certification) {
       return res.status(404).json({

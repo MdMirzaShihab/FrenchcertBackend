@@ -6,33 +6,35 @@ const certificationSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, 'Certification name is required'],
       trim: true,
       unique: true,
+      maxlength: [100, 'Certification name cannot exceed 100 characters'],
+      minlength: [3, 'Certification name must be at least 3 characters long']
     },
     shortDescription: {
       type: String,
-      required: true,
+      required: [true, 'Short description is required'],
       trim: true,
       validate: {
         validator: function(v) {
           const wordCount = v.trim().split(/\s+/).filter(word => word.length > 0).length;
           return wordCount >= 10 && wordCount <= 20;
         },
-        message: 'shortDescription must contain between 10 to 20 words',
+        message: 'Short description must contain between 10 to 20 words',
       },
+      maxlength: [200, 'Short description cannot exceed 200 characters']
     },
     description: {
       type: String,
       required: true,
       set: (value) => sanitizeHtml(value, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img']),
+        allowedTags: sanitizeHtml.defaults.allowedTags, 
         allowedAttributes: {
           ...sanitizeHtml.defaults.allowedAttributes,
-          a: ['href', 'name', 'target', 'rel'],
-          img: ['src', 'alt', 'width', 'height']
+          a: ['href', 'name', 'target', 'rel'] 
         },
-        allowedSchemes: ['http', 'https', 'data']
+        allowedSchemes: ['http', 'https'] 
       })
     },
     certificationType: {

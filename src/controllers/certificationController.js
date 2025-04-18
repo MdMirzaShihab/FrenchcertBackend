@@ -365,7 +365,7 @@ exports.getCertificationTypes = async (req, res) => {
 // Get public certifications
 exports.getPublicCertifications = async (req, res) => {
   try {
-    const { search, type, page = 1, limit = 10 } = req.query;
+    const { search, type, page = 1, limit = 10, exclude } = req.query;
     const query = {};
     const options = {
       page: parseInt(page),
@@ -382,6 +382,19 @@ exports.getPublicCertifications = async (req, res) => {
     // Filter by certificationType
     if (type) {
       query.certificationType = type;
+    }
+
+    // Exclude specific certification(s)
+    if (exclude) {
+      const excludeIds = exclude.split(',').map(id => id.trim());
+      // Validate each ID is a valid ObjectId
+      if (excludeIds.some(id => !mongoose.Types.ObjectId.isValid(id))) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid certification ID(s) in exclude parameter"
+        });
+      }
+      query._id = { $nin: excludeIds };
     }
 
     const result = await Certification.paginate(query, options);

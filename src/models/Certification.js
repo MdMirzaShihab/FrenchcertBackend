@@ -47,7 +47,7 @@ const certificationSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Call to action text is required'],
       trim: true,
-      maxlength: [50, 'Call to action cannot exceed 50 characters']
+      maxlength: [150, 'Call to action cannot exceed 150 characters']
     },
     fields: {
       type: [

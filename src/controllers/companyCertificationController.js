@@ -122,7 +122,7 @@ exports.createCompanyCertification = async (req, res) => {
       });
     }
     
-    // Validate certification exists
+    // Validate certification exists and get duration
     const certification = await Certification.findById(req.body.certification);
     if (!certification) {
       return res.status(404).json({
@@ -130,7 +130,17 @@ exports.createCompanyCertification = async (req, res) => {
         message: 'Certification not found'
       });
     }
-    
+
+    // If expiryDate is not provided, calculate it from certification duration
+    if (!req.body.expiryDate && certification.durationInMonths) {
+      const issueDate = req.body.issueDate ? new Date(req.body.issueDate) : new Date();
+      const expiryDate = new Date(issueDate);
+      expiryDate.setMonth(expiryDate.getMonth() + certification.durationInMonths);
+      // Subtract 1 day as requested
+      expiryDate.setDate(expiryDate.getDate() - 1);
+      req.body.expiryDate = expiryDate;
+    }
+
     const companyCertification = await CompanyCertification.create(req.body);
     
     res.status(201).json({
@@ -156,24 +166,39 @@ exports.createCompanyCertification = async (req, res) => {
 // Update company certification
 exports.updateCompanyCertification = async (req, res) => {
   try {
-    const companyCertification = await CompanyCertification.findByIdAndUpdate(
+    // Get the existing certification first
+    const existingCert = await CompanyCertification.findById(req.params.id)
+      .populate('certification');
+    
+    if (!existingCert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Company certification not found'
+      });
+    }
+
+    // Check if we need to recalculate expiry date
+    if (req.body.issueDate && !req.body.expiryDate && existingCert.certification?.durationInMonths) {
+      const newIssueDate = new Date(req.body.issueDate);
+      const newExpiryDate = new Date(newIssueDate);
+      newExpiryDate.setMonth(newExpiryDate.getMonth() + existingCert.certification.durationInMonths);
+      // Subtract 1 day as requested
+      newExpiryDate.setDate(newExpiryDate.getDate() - 1);
+      req.body.expiryDate = newExpiryDate;
+    }
+
+    // Perform the update
+    const updatedCert = await CompanyCertification.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
     )
       .populate('company')
       .populate('certification');
-    
-    if (!companyCertification) {
-      return res.status(404).json({
-        success: false,
-        message: 'Company certification not found'
-      });
-    }
-    
+
     res.status(200).json({
       success: true,
-      data: companyCertification
+      data: updatedCert
     });
   } catch (error) {
     if (error.code === 11000) {

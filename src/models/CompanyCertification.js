@@ -23,13 +23,12 @@ const companyCertificationSchema = new mongoose.Schema({
     type: Date
   },
   expiryDate: {
-    type: Date,
-    required: true
+    type: Date
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'suspended', 'expired'],
-    default: 'active'
+    enum: [ 'active', 'suspended', 'expired', 'recertification'],
+    required: true
   },
   certificationId: {
     type: String,

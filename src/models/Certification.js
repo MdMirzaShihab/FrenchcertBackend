@@ -19,11 +19,11 @@ const certificationSchema = new mongoose.Schema(
       validate: {
         validator: function(v) {
           const wordCount = v.trim().split(/\s+/).filter(word => word.length > 0).length;
-          return wordCount >= 10 && wordCount <= 20;
+          return wordCount >= 10 && wordCount <= 35;
         },
-        message: 'Short description must contain between 10 to 20 words',
+        message: 'Short description must contain between 10 to 35 words',
       },
-      maxlength: [200, 'Short description cannot exceed 200 characters']
+      maxlength: [300, 'Short description cannot exceed 300 characters']
     },
     description: {
       type: String,
@@ -68,7 +68,7 @@ const certificationSchema = new mongoose.Schema(
     durationInMonths: {
       type: Number,
       min: [1, 'Duration must be at least 1 month'],
-      max: [99, 'Duration cannot exceed 36 months'],
+      max: [99, 'Duration cannot exceed 99 months'],
       required: [true, 'Duration is required'],
     },
   },

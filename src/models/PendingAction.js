@@ -31,11 +31,7 @@ const pendingActionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  reviewDate: Date,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  reviewDate: Date,  
+}, { timestamps: true });
 
 module.exports = mongoose.model('PendingAction', pendingActionSchema);

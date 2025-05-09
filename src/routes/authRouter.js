@@ -5,6 +5,7 @@ const { validateRegister, validateLogin } = require('../validators/auth');
 
 router.post('/register', validateRegister, authController.register);
 router.post('/login', validateLogin, authController.login);
+router.post('/logout', authController.logout);
+router.get('/csrf-token', authController.getCSRFToken);
 
 module.exports = router;
-

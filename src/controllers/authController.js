@@ -1,3 +1,4 @@
+// controllers/authController.js
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -17,16 +18,24 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    // Only admins can create other admins
-    if (req.body.role === 'admin' && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can create admin users' });
-    }
-
     const user = new User(req.body);
     await user.save();
     
+    // Generate token but don't send in response
     const token = generateToken(user);
-    res.status(201).json({ token });
+    
+    // Set HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'None',
+      maxAge: 86400000 // 1 day in ms
+    });
+    
+    res.status(201).json({ 
+      success: true,
+      user: { id: user._id, email: user.email, role: user.role }
+    });
   } catch (err) {
     next(err);
   }
@@ -46,8 +55,49 @@ exports.login = async (req, res, next) => {
     }
     
     const token = generateToken(user);
-    res.json({ token });
+    
+    // Set HTTP-only cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'None',
+      maxAge: 86400000 // 1 day in ms
+    });
+
+    // Set CSRF token in a separate cookie
+    const csrfToken = req.csrfToken();
+    res.cookie('XSRF-TOKEN', csrfToken, {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'None'
+    });
+    
+    res.json({ 
+      success: true,
+      user: { id: user._id, email: user.email, role: user.role }
+    });
   } catch (err) {
     next(err);
   }
+};
+
+exports.logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None'
+  });
+  res.clearCookie('XSRF-TOKEN', {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None'
+  });
+  res.json({ success: true, message: 'Logged out successfully' });
+};
+
+exports.getCSRFToken = (req, res) => {
+  const csrfToken = req.csrfToken();
+  res.cookie('XSRF-TOKEN', csrfToken, {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None'
+  });
+  res.json({ csrfToken });
 };

@@ -1,10 +1,10 @@
-
 const jwt = require('jsonwebtoken');
 const httpErrors = require('http-errors');
 
 exports.authenticate = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    // Get token from cookies instead of header
+    const token = req.cookies.token;
     if (!token) throw httpErrors(401, 'Authentication required');
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

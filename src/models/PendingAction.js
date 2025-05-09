@@ -1,4 +1,3 @@
-// models/PendingAction.js
 const mongoose = require('mongoose');
 
 const actionTypes = ['create', 'update', 'delete'];

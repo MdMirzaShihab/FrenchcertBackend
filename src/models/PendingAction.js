@@ -30,7 +30,13 @@ const pendingActionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  reviewDate: Date,  
+  reviewDate: Date,
+  rejectionReason: String  
 }, { timestamps: true });
+
+// Index to improve query performance
+pendingActionSchema.index({ status: 1 });
+pendingActionSchema.index({ requestedBy: 1, status: 1 });
+pendingActionSchema.index({ resourceType: 1, resourceId: 1 });
 
 module.exports = mongoose.model('PendingAction', pendingActionSchema);

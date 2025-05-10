@@ -15,21 +15,27 @@
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
+    "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "csurf": "^1.10.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.0",
     "mongoose-paginate-v2": "^1.9.0",
     "morgan": "^1.10.0",
+    "nodemailer": "^7.0.3",
     "sanitize-html": "^2.15.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0",
+    "xss-clean": "^0.1.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

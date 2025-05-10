@@ -1,11 +1,16 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
-const bodyParser = require('body-parser');
-const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
 const csrf = require('csurf');
+const morgan = require('morgan');
+const path = require('path');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const compression = require('compression');
+const hpp = require('hpp');
 
 const fieldRouter = require('./routes/fieldRouter');
 const certificationRouter = require('./routes/certificationRouter');
@@ -15,55 +20,65 @@ const companyCertificationRouter = require('./routes/companyCertificationRouter'
 const dashboardRouter = require('./routes/dashboardRouter');
 const authRouter = require('./routes/authRouter');
 const adminRouter = require('./routes/adminRouter');
+const userRouter = require('./routes/userRouter');
 
+// Import middleware
+const errorHandler = require('./middlewares/errorHandler');
+const logger = require('./utils/logger');
+
+// Create Express app
 const app = express();
 
+// Global middleware
 // Set security HTTP headers
 app.use(helmet());
 
-// Enable CORS
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-}));
+// Morgan request logger
+app.use(morgan('combined', { stream: logger.stream }));
 
-
-// CSRF protection
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'None',
-    maxAge: 86400 // 24 hours
-  }
-});
-
-// Apply CSRF to all routes except GET and auth routes
-app.use((req, res, next) => {
-  if (req.method === 'GET' || req.path.startsWith('/api/auth')) {
-    return next();
-  }
-  csrfProtection(req, res, next);
-});
-
-// Logging requests in development mode
-app.use(morgan('dev'));
-
-// Parse JSON and URL-encoded data
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Body parser
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Cookie parser
 app.use(cookieParser());
 
-// Rate limiter to prevent excessive requests
-// const limiter = rateLimit({
-//   // windowMs: 15 * 60 * 1000, // 15 minutes
-//   // max: 100, // Limit each IP to 100 requests per window
-//   message: { error: "Too many requests from this IP, please try again later" },
-// });
-// app.use('/api/', limiter);
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+app.use(xss());
+
+// Prevent parameter pollution
+app.use(hpp());
+
+// Compression
+app.use(compression());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per windowMs per IP
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api', limiter);
+
+// CORS
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+// CSRF protection
+const csrfProtection = csrf({ 
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None'
+  }
+});
 
 //Rooutes
 app.use('/api/fields', fieldRouter);  
@@ -74,6 +89,7 @@ app.use('/api/company-certifications', companyCertificationRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/user', userRouter);
 
 
 // Default Route
@@ -81,5 +97,16 @@ app.get('/', (req, res) => {
   res.send('FrenchCert Backend Running');
 });
 
+// 404 route
+app.all('*', (req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: `Cannot find ${req.originalUrl} on this server!`
+  });
+});
+
+
+// Error handling middleware
+app.use(errorHandler);
 
 module.exports = app;

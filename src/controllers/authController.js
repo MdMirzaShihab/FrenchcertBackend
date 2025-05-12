@@ -79,17 +79,21 @@ exports.login = async (req, res, next) => {
       maxAge: 3600000 // 1 hour
     });
 
+    console.log('Login attempt for email:', req.body.email); // Log email
+    
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     
-    // Check if user exists
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(401).json({ 
         success: false,
         message: 'Invalid credentials',
-        csrfToken
+        csrfToken: req.csrfToken()
       });
     }
+    
+    console.log('Found user:', user.email); // Log found user
     
     // Check if account is locked
     if (user.isLocked()) {
@@ -103,16 +107,18 @@ exports.login = async (req, res, next) => {
 
     // Check if password is correct
     const isMatch = await user.comparePassword(password);
+    console.log('Password match result:', isMatch); // Log match result
+    
     if (!isMatch) {
-      // Increment failed login attempts
+      console.log('Password mismatch for user:', user.email);
       await user.incrementLoginAttempts();
-      
       return res.status(401).json({ 
         success: false,
         message: 'Invalid credentials',
-        csrfToken
+        csrfToken: req.csrfToken()
       });
     }
+    
     
     // Check if account is active
     if (!user.isActive) {
@@ -131,17 +137,19 @@ exports.login = async (req, res, next) => {
     const refreshToken = generateRefreshToken(user);
     
     // Set HTTP-only cookies
-    res.cookie('accessToken', accessToken, {
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      maxAge: 3600000 // 1 hour
-    });
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      maxAge: 3600000, // 1 hour
+      path: '/'
+    };
     
+    res.cookie('accessToken', accessToken, cookieOptions);
+    
+    // Refresh token with longer expiry
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
+      ...cookieOptions,
       maxAge: 7 * 24 * 3600000 // 7 days
     });
     
@@ -230,12 +238,14 @@ exports.logout = (req, res) => {
 
 exports.getCSRFToken = (req, res) => {
   const csrfToken = req.csrfToken();
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log('ENV:', process.env.NODE_ENV);
   res.cookie('XSRF-TOKEN', csrfToken, {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'None',
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax',
     maxAge: 3600000 // 1 hour
   });
-  res.json({ csrfToken });
+  res.json({ success: true, csrfToken });
 };
 
 exports.forgotPassword = async (req, res, next) => {

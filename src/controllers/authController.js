@@ -29,40 +29,25 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const user = new User(req.body);
+    const userData = {
+      email: req.body.email,
+      password: req.body.password,
+      role: req.body.role || 'user',
+      isActive: req.body.isActive !== undefined ? req.body.isActive : true
+    };
+
+    const user = new User(userData);
     await user.save();
     
-    // Generate tokens
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-    
-    // Set HTTP-only cookies
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      maxAge: 3600000 // 1 hour
-    });
-    
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      maxAge: 7 * 24 * 3600000 // 7 days
-    });
-    
-    // Set CSRF token in a separate cookie
-    const csrfToken = req.csrfToken();
-    res.cookie('XSRF-TOKEN', csrfToken, {
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',
-      maxAge: 3600000 // 1 hour
-    });
-    
-    res.status(201).json({ 
+    return res.status(201).json({ 
       success: true,
-      user: { id: user._id, email: user.email, role: user.role },
-      csrfToken
+      message: 'User created successfully',
+      user: { 
+        id: user._id, 
+        email: user.email, 
+        role: user.role, 
+        isActive: user.isActive 
+      }
     });
   } catch (err) {
     next(err);
@@ -165,12 +150,14 @@ exports.login = async (req, res, next) => {
 
 exports.refreshToken = async (req, res, next) => {
   try {
+    console.log('Refresh Token - Incoming Headers:', req.headers);
+    console.log('Refresh Token - Cookies:', req.cookies);
+
     const refreshToken = req.cookies.refreshToken;
-    
     if (!refreshToken) {
       return res.status(401).json({ message: 'Refresh token not found' });
     }
-    
+
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
     const user = await User.findById(decoded.id);
@@ -178,34 +165,36 @@ exports.refreshToken = async (req, res, next) => {
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
-    
-    // Generate new access token
+
+    // Generate new tokens
     const accessToken = generateAccessToken(user);
-    
-    // Set new access token in cookie
+    const newCsrfToken = req.csrfToken(); // Generate new CSRF token
+
+    // Set cookies
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'None',
-      maxAge: 3600000 // 1 hour
+      maxAge: 3600000
     });
-    
-    // Set new CSRF token
-    const csrfToken = req.csrfToken();
-    res.cookie('XSRF-TOKEN', csrfToken, {
+
+    res.cookie('XSRF-TOKEN', newCsrfToken, {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'None',
-      maxAge: 3600000 // 1 hour
+      httpOnly: false, // Must be readable by client
+      maxAge: 3600000
     });
-    
+
     res.json({ 
       success: true,
-      csrfToken
+      csrfToken: newCsrfToken
     });
+
   } catch (err) {
-    // Clear cookies if refresh token is invalid
+    console.error('Refresh Token Error:', err);
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
+    res.clearCookie('XSRF-TOKEN');
     
     if (err instanceof jwt.TokenExpiredError) {
       return res.status(401).json({ message: 'Refresh token expired' });

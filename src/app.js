@@ -17,10 +17,12 @@ const certificationRouter = require("./routes/certificationRouter");
 const trainingRouter = require("./routes/trainingRouter");
 const companyRouter = require("./routes/companyRouter");
 const companyCertificationRouter = require("./routes/companyCertificationRouter");
+const companyTrainingRouter = require("./routes/companyTrainingRouter");
 const dashboardRouter = require("./routes/dashboardRouter");
 const authRouter = require("./routes/authRouter");
 const adminRouter = require("./routes/adminRouter");
-const userRouter = require("./routes/userRouter");
+const pageRouter = require('./routes/pageRouter');
+const companyInquiryRouter = require('./routes/companyInquiryRouter');
 
 // Import middleware
 const errorHandler = require("./middlewares/errorHandler");
@@ -90,10 +92,12 @@ app.use("/api/certifications", certificationRouter);
 app.use("/api/trainings", trainingRouter);
 app.use("/api/companies", companyRouter);
 app.use("/api/company-certifications", companyCertificationRouter);
+app.use("/api/company-trainings", companyTrainingRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
-app.use("/api/user", userRouter);
+app.use("/api/pages", pageRouter);
+app.use("/api/company-inquiries", companyInquiryRouter);
 
 // Default Route
 app.get("/", (req, res) => {

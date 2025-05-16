@@ -32,7 +32,7 @@ exports.getAllFields = async (req, res) => {
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { name: 1 },
-      collation: { locale: "en", strength: 2 }, // Case-insensitive sorting
+      collation: { locale: "en", strength: 2 }, 
     };
 
     if (search) Object.assign(query, buildSearchQuery(search));
@@ -58,8 +58,7 @@ exports.getAllFields = async (req, res) => {
   }
 };
 
-// Get single field with references
-// Get single field with references
+
 // Get single field with references
 exports.getField = async (req, res) => {
   try {

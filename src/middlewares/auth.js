@@ -49,17 +49,23 @@ exports.loginLimiter = rateLimit({
 
 // CSRF protection middleware
 exports.csrfProtection = (req, res, next) => {
-  // Skip CSRF check for non-modifying operations
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+  // Skip CSRF check for GET, HEAD, OPTIONS requests
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
 
-  const clientToken =
-    req.headers["x-csrf-token"] || req.headers["x-xsrf-token"];
-  const serverToken = req.cookies["XSRF-TOKEN"];
+  // Get token from headers
+  const csrfHeader = req.headers['x-xsrf-token'] || req.headers['x-csrf-token'];
+  const csrfCookie = req.cookies['XSRF-TOKEN'];
 
-  if (!clientToken || !serverToken || clientToken !== serverToken) {
-    return next(httpErrors(403, "CSRF token validation failed"));
+  console.log('CSRF Validation:', {
+    header: csrfHeader,
+    cookie: csrfCookie,
+    path: req.path
+  });
+
+  if (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie) {
+    return next(httpErrors(403, 'CSRF token validation failed'));
   }
 
   next();

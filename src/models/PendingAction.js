@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const actionTypes = ['create', 'update', 'delete'];
-const resourceTypes = ['Certification', 'Company', 'CompanyCertification', 'CompanyTraining', 'Field', 'Training'];
+const resourceTypes = ['Certification', 'Company', 'CompanyCertification', 'CompanyTraining', 'Field', 'Training', 'Page'];
 
 const pendingActionSchema = new mongoose.Schema({
   actionType: {
